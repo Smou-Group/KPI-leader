@@ -1,94 +1,542 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="utf-8">
-<title>كشف العائلة</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>KPI المشرفين | SMOU</title>
 
-<style>
-body{
-  font-family: Tahoma, Arial;
-  background:#f7f7f7;
-  padding:20px;
-}
-h2{margin-bottom:10px}
-input{
-  padding:10px;
-  width:300px;
-  font-size:16px;
-}
-table{
-  width:100%;
-  border-collapse:collapse;
-  margin-top:15px;
-  background:#fff;
-}
-th,td{
-  border:1px solid #ccc;
-  padding:10px;
-  text-align:right;
-}
-th{
-  background:#0f5c6e;
-  color:#fff;
-}
-tr:nth-child(even){background:#f2f2f2}
-.note{color:#666;margin-top:8px}
-</style>
+  <!-- Chart.js (اختياري) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- Excel (SheetJS) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <style>
+    :root{
+      --brand:#1c6670; --brand2:#15545c; --bg:#f3f5f6; --card:#fff;
+      --muted:#6b7c85; --grid:#e7ecef; --danger:#c62828; --ok:#2e7d32;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Tahoma,Arial,sans-serif;background:var(--bg);color:#0b2230;padding:18px}
+    .wrap{max-width:1450px;margin:0 auto}
+    .card{background:var(--card);border-radius:18px;box-shadow:0 14px 40px rgba(0,0,0,.10);padding:16px;border:1px solid rgba(0,0,0,.05)}
+    header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:14px}
+    .title{display:flex;align-items:center;gap:10px}
+    .logo{width:44px;height:44px;border-radius:12px;border:1px solid rgba(0,0,0,.08);object-fit:contain;background:#fff;padding:6px}
+    h1{margin:0;font-size:22px}
+    .sub{color:var(--muted);font-size:13px;margin-top:2px}
+    .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    button,.chip{font-family:inherit;border-radius:12px;border:1px solid rgba(0,0,0,.12);padding:10px 12px;font-weight:700}
+    button{background:var(--brand);color:#fff;border:1px solid rgba(255,255,255,.15);cursor:pointer;box-shadow:0 10px 22px rgba(28,102,112,.15)}
+    button:hover{background:var(--brand2)}
+    .chip{background:#fff;color:#0b2230;cursor:default;font-weight:800}
+    .chip b{color:var(--brand)}
+    .danger{background:#fff;color:var(--danger);border-color:rgba(198,40,40,.35);cursor:pointer}
+    .danger:hover{background:#fff1f1}
+    .mutedBtn{background:#0f2f35}
+    .mutedBtn:hover{background:#0b2429}
+    .fileInput{display:none}
+
+    .grid2{display:grid;grid-template-columns:1.2fr .8fr;gap:14px;margin-top:14px}
+    @media (max-width:1100px){.grid2{grid-template-columns:1fr}}
+
+    .tableWrap{overflow:auto;border-radius:14px;border:1px solid rgba(0,0,0,.08)}
+    table{border-collapse:separate;border-spacing:0;width:100%;min-width:1200px;background:#fff}
+    thead th{position:sticky;top:0;z-index:2;background:#e9f1f2;border-bottom:1px solid rgba(0,0,0,.10);padding:10px;font-size:13px;white-space:nowrap;text-align:center}
+    tbody td{border-bottom:1px solid var(--grid);padding:8px;text-align:center;vertical-align:middle;font-size:13px;background:#fff}
+    tbody tr:hover td{background:#fbfdff}
+    th.stickyRight, td.stickyRight{position:sticky;right:0;z-index:3;background:#fff;box-shadow:-10px 0 14px rgba(0,0,0,.04);text-align:right;min-width:300px}
+    thead th.stickyRight{background:#e9f1f2}
+    th.small, td.small{min-width:92px}
+    th.wide, td.wide{min-width:140px}
+    .kpiName{font-weight:800;line-height:1.25}
+    .hint{color:var(--muted);font-size:12px;margin-top:3px}
+
+    input[type="number"]{width:92px;padding:8px 10px;border-radius:10px;border:1px solid rgba(0,0,0,.14);font-weight:800;text-align:center;outline:none}
+    input[type="number"]:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(28,102,112,.12)}
+    .adminInput{width:84px !important;padding:7px 8px !important;font-weight:900 !important;background:#f8fbfb}
+
+    .scoreCell{font-weight:900;border-right:1px solid var(--grid);min-width:78px;margin-top:6px}
+    .scoreOk{color:var(--ok)}
+    .scoreBad{color:var(--danger)}
+
+    .totalRow td{background:#0f2f35 !important;color:#fff;font-weight:900;border-bottom:none}
+    .totalRow td.stickyRight{background:#0f2f35 !important}
+    .totalBadge{display:inline-block;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);min-width:64px}
+
+    .chartCard{padding:14px;border:1px solid rgba(0,0,0,.08);border-radius:14px;background:#fff}
+    .chartHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+    .chartHead h2{margin:0;font-size:16px}
+    .legendNote{color:var(--muted);font-size:12px}
+    canvas{max-height:420px}
+    .foot{margin-top:10px;color:var(--muted);font-size:12px;line-height:1.6}
+  </style>
 </head>
 
 <body>
+<div class="wrap">
+  <div class="card">
 
-<h2>🔎 البحث باسم العائلة</h2>
+    <header>
+      <div class="title">
+        <img class="logo" src="logo.png" alt="SMOU Logo" onerror="this.style.display='none'">
+        <div>
+          <h1>نظام KPI للمشرفين</h1>
+          <div class="sub">
+            أدخل القيم لكل مشرف، ويمكن للمدير تعديل <b>المطلوب</b> و<b>الوزن</b> من داخل الجدول. النتيجة النهائية دائمًا <b>من 100</b>.
+          </div>
+        </div>
+      </div>
 
-<input id="search" placeholder="اكتب اسم العائلة" />
-<div class="note" id="info">يرجى رفع ملف البيانات</div>
-<br><br>
-<input type="file" id="file" accept=".csv">
+      <div class="toolbar">
+        <span class="chip">متوسط الإجمالي: <b id="grandTotal">0</b> / 100</span>
+        <span class="chip">مجموع الأوزان: <b id="sumWeightsTop">—</b></span>
 
-<table id="table" style="display:none">
-  <thead></thead>
-  <tbody></tbody>
-</table>
+        <button class="mutedBtn" id="addRepBtn">إضافة مشرف</button>
+
+        <button id="exportXlsxBtn">تصدير Excel</button>
+        <button id="importXlsxBtn">استيراد Excel</button>
+        <input class="fileInput" id="importXlsxFile" type="file" accept=".xlsx,.xls" />
+
+        <button class="danger" id="resetBtn">مسح القيم</button>
+      </div>
+    </header>
+
+    <div class="grid2">
+
+      <div>
+        <div class="tableWrap">
+          <table id="kpiTable">
+            <thead id="thead"></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+
+        <div class="foot">
+          <b>طريقة الحساب:</b><br>
+          النقاط لكل بند = <code>min(Actual ÷ Target, 1) × Weight</code><br>
+          ثم تحويل الإجمالي إلى 100: <code>(Total ÷ SumWeights) × 100</code>
+        </div>
+      </div>
+
+      <div class="chartCard">
+        <div class="chartHead">
+          <h2>مخطط الأداء</h2>
+          <div class="legendNote" id="chartStatus">النتيجة من 100</div>
+        </div>
+        <canvas id="chart"></canvas>
+        <div class="foot" id="chartHint"></div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
 
 <script>
-let data=[], headers=[];
-const FAMILY_COL = "العائلة";
+const STORAGE_KEY = "smou_kpi_supervisors_v1";
 
-document.getElementById("file").addEventListener("change", async e=>{
-  const text = await e.target.files[0].text();
-  const lines = text.trim().split("\n");
-  headers = lines[0].split(",");
-  data = lines.slice(1).map(l=>{
-    let obj={};
-    l.split(",").forEach((v,i)=>obj[headers[i]]=v);
-    return obj;
+/* البنود حسب الصورة */
+const defaultKpis = [
+  { id:"k1", name:"تحقيق التارجت للفريق",                 target:10, weight:10 },
+  { id:"k2", name:"عدد الزيارات الشهرية مع المناديب",     target:12, weight:10 },
+  { id:"k3", name:"متابعة جروب المواقع والمكاتب",         target:20, weight:10 },
+  { id:"k4", name:"مراجعة التقارير اليومية",              target:20, weight:10 },
+  { id:"k5", name:"مراجعة كشف عروض الأسعار تكييف",        target:4,  weight:10 },
+  { id:"k6", name:"مراجعة كشف عروض أسعار مصاعد",          target:4,  weight:10 },
+  { id:"k7", name:"الالتزام بإرسال كشف السوشيال ميديا",   target:4,  weight:10 },
+  { id:"k8", name:"الالتزام بورشة العمل بواقع مرة أسبوعيًا", target:4, weight:10 },
+];
+
+/* أسماء المشرفين (تقدر تغيرهم/تزودهم من زر إضافة مشرف) */
+const defaultReps = ["التارجت","شادي عبه","أحمد طه","محمد هاني"];
+
+let state = loadState();
+let chart = null;
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return { kpis: defaultKpis, reps: defaultReps, actuals:{} };
+    const parsed = JSON.parse(raw);
+    if(!parsed.kpis || !parsed.reps) throw new Error("Bad");
+    if(!parsed.actuals) parsed.actuals = {};
+    return parsed;
+  }catch(e){
+    return { kpis: defaultKpis, reps: defaultReps, actuals:{} };
+  }
+}
+function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+function ensureActuals(){
+  for(const k of state.kpis){
+    if(!state.actuals[k.id]) state.actuals[k.id] = Array(state.reps.length).fill(0);
+    if(state.actuals[k.id].length !== state.reps.length){
+      const old = state.actuals[k.id];
+      state.actuals[k.id] = Array(state.reps.length).fill(0).map((_,i)=> old[i] ?? 0);
+    }
+  }
+}
+
+function round1(n){ return Math.round((n + Number.EPSILON) * 10) / 10; }
+function sumWeights(){ return state.kpis.reduce((s,k)=> s + (Number(k.weight) || 0), 0); }
+
+function scoreFor(kpi, actual){
+  const a = Number(actual) || 0;
+  const t = Number(kpi.target) || 0;
+  const w = Number(kpi.weight) || 0;
+  if(t <= 0 || w <= 0) return 0;
+  return Math.min(a / t, 1) * w;
+}
+
+function totalForRep(idx){
+  let total = 0;
+  const maxW = sumWeights();
+  for(const k of state.kpis){
+    const actual = (state.actuals[k.id] && state.actuals[k.id][idx]) ?? 0;
+    total += scoreFor(k, actual);
+  }
+  if(maxW <= 0) return 0;
+  return round1((total / maxW) * 100);
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, m => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[m]));
+}
+
+function render(){
+  ensureActuals();
+  document.getElementById("sumWeightsTop").textContent = sumWeights();
+
+  const thead = document.getElementById("thead");
+  const tbody = document.getElementById("tbody");
+  thead.innerHTML = "";
+  tbody.innerHTML = "";
+
+  const tr1 = document.createElement("tr");
+
+  const thKpi = document.createElement("th");
+  thKpi.className = "stickyRight wide";
+  thKpi.textContent = "بنود التقييم";
+  tr1.appendChild(thKpi);
+
+  const thTarget = document.createElement("th");
+  thTarget.className = "small";
+  thTarget.textContent = "المطلوب (قابل للتعديل)";
+  tr1.appendChild(thTarget);
+
+  const thWeight = document.createElement("th");
+  thWeight.className = "small";
+  thWeight.textContent = "الوزن (قابل للتعديل)";
+  tr1.appendChild(thWeight);
+
+  state.reps.forEach((name) => {
+    const th = document.createElement("th");
+    th.className = "wide";
+    th.innerHTML = `${escapeHtml(name)}<div class="hint">فعلي / نقاط</div>`;
+    tr1.appendChild(th);
   });
-  document.getElementById("info").innerText="تم تحميل البيانات";
-});
 
-document.getElementById("search").addEventListener("input",()=>{
-  const q = document.getElementById("search").value.trim();
-  const table = document.getElementById("table");
-  const thead = table.querySelector("thead");
-  const tbody = table.querySelector("tbody");
+  thead.appendChild(tr1);
 
-  if(!q){ table.style.display="none"; return; }
+  state.kpis.forEach((kpi, kpiIndex) => {
+    const tr = document.createElement("tr");
 
-  const norm = s => (s||"").toString().trim().replace(/\s+/g," ");
-const res = data.filter(r => norm(r[FAMILY_COL]).includes(norm(q)));
+    const tdName = document.createElement("td");
+    tdName.className = "stickyRight";
+    tdName.innerHTML = `<div class="kpiName">${escapeHtml(kpi.name)}</div>`;
+    tr.appendChild(tdName);
 
-  if(!res.length){
-    document.getElementById("info").innerText="لا توجد نتائج";
-    table.style.display="none";
+    const tdTarget = document.createElement("td");
+    tdTarget.className = "small";
+    const targetInput = document.createElement("input");
+    targetInput.type = "number";
+    targetInput.min = "0";
+    targetInput.step = "1";
+    targetInput.value = Number(kpi.target) || 0;
+    targetInput.className = "adminInput";
+    targetInput.addEventListener("input", () => {
+      state.kpis[kpiIndex].target = Number(targetInput.value) || 0;
+      saveState();
+      refreshRowScores(kpi.id);
+      renderTotalsAndChart();
+    });
+    tdTarget.appendChild(targetInput);
+    tr.appendChild(tdTarget);
+
+    const tdWeight = document.createElement("td");
+    tdWeight.className = "small";
+    const weightInput = document.createElement("input");
+    weightInput.type = "number";
+    weightInput.min = "0";
+    weightInput.step = "1";
+    weightInput.value = Number(kpi.weight) || 0;
+    weightInput.className = "adminInput";
+    weightInput.addEventListener("input", () => {
+      state.kpis[kpiIndex].weight = Number(weightInput.value) || 0;
+      saveState();
+      document.getElementById("sumWeightsTop").textContent = sumWeights();
+      const sumWCell = document.getElementById("sumWCell");
+      if(sumWCell) sumWCell.textContent = sumWeights();
+      refreshRowScores(kpi.id);
+      renderTotalsAndChart();
+    });
+    tdWeight.appendChild(weightInput);
+    tr.appendChild(tdWeight);
+
+    state.reps.forEach((_, repIdx) => {
+      const td = document.createElement("td");
+      const val = state.actuals[kpi.id][repIdx] ?? 0;
+
+      const input = document.createElement("input");
+      input.type = "number";
+      input.min = "0";
+      input.step = "1";
+      input.value = val;
+
+      const scoreSpan = document.createElement("div");
+      scoreSpan.className = "scoreCell";
+      scoreSpan.dataset.kpi = kpi.id;
+      scoreSpan.dataset.rep = String(repIdx);
+
+      const s = scoreFor(kpi, val);
+      scoreSpan.textContent = round1(s);
+
+      const ratio = kpi.target > 0 ? Math.min((Number(val)||0)/kpi.target, 1) : 0;
+      scoreSpan.classList.toggle("scoreOk", ratio >= 0.8);
+      scoreSpan.classList.toggle("scoreBad", ratio < 0.5);
+
+      input.addEventListener("input", () => {
+        const n = Number(input.value) || 0;
+        state.actuals[kpi.id][repIdx] = n;
+
+        const currentKpi = state.kpis.find(x=>x.id===kpi.id) || kpi;
+        const newScore = scoreFor(currentKpi, n);
+        scoreSpan.textContent = round1(newScore);
+
+        const newRatio = currentKpi.target > 0 ? Math.min(n/currentKpi.target, 1) : 0;
+        scoreSpan.classList.toggle("scoreOk", newRatio >= 0.8);
+        scoreSpan.classList.toggle("scoreBad", newRatio < 0.5);
+
+        saveState();
+        renderTotalsAndChart();
+      });
+
+      td.appendChild(input);
+      td.appendChild(scoreSpan);
+      tr.appendChild(td);
+    });
+
+    tbody.appendChild(tr);
+  });
+
+  const trTot = document.createElement("tr");
+  trTot.className = "totalRow";
+
+  const tdTotName = document.createElement("td");
+  tdTotName.className = "stickyRight";
+  tdTotName.textContent = "الإجمالي (من 100)";
+  trTot.appendChild(tdTotName);
+
+  const tdEmpty1 = document.createElement("td");
+  tdEmpty1.textContent = "";
+  trTot.appendChild(tdEmpty1);
+
+  const tdSumW = document.createElement("td");
+  tdSumW.id = "sumWCell";
+  tdSumW.textContent = sumWeights();
+  trTot.appendChild(tdSumW);
+
+  state.reps.forEach((_, repIdx) => {
+    const td = document.createElement("td");
+    td.innerHTML = `<span class="totalBadge" id="tot_${repIdx}">0</span>`;
+    trTot.appendChild(td);
+  });
+
+  tbody.appendChild(trTot);
+
+  renderTotalsAndChart();
+}
+
+function refreshRowScores(kpiId){
+  const kpi = state.kpis.find(k=>k.id===kpiId);
+  if(!kpi) return;
+
+  const spans = document.querySelectorAll(`.scoreCell[data-kpi="${CSS.escape(kpiId)}"]`);
+  spans.forEach(span => {
+    const repIdx = Number(span.dataset.rep);
+    const actual = (state.actuals[kpiId] && state.actuals[kpiId][repIdx]) ?? 0;
+
+    const s = scoreFor(kpi, actual);
+    span.textContent = round1(s);
+
+    const ratio = kpi.target > 0 ? Math.min((Number(actual)||0)/kpi.target, 1) : 0;
+    span.classList.toggle("scoreOk", ratio >= 0.8);
+    span.classList.toggle("scoreBad", ratio < 0.5);
+  });
+}
+
+function renderTotalsAndChart(){
+  const totals = state.reps.map((_, i) => totalForRep(i));
+  totals.forEach((t, i) => {
+    const el = document.getElementById(`tot_${i}`);
+    if(el) el.textContent = t;
+  });
+
+  const avg = totals.length ? round1(totals.reduce((a,b)=>a+b,0)/totals.length) : 0;
+  document.getElementById("grandTotal").textContent = avg;
+
+  try{
+    if(typeof Chart === "undefined"){
+      document.getElementById("chartStatus").textContent = "المخطط غير متاح (Chart.js غير محمّل)";
+      document.getElementById("chartHint").textContent = "الإجمالي شغال، لكن المخطط يحتاج تحميل Chart.js.";
+      return;
+    }else{
+      document.getElementById("chartStatus").textContent = "النتيجة من 100";
+      document.getElementById("chartHint").textContent = "";
+    }
+
+    if(!chart){
+      const ctx = document.getElementById("chart");
+      chart = new Chart(ctx, {
+        type: "bar",
+        data: { labels: state.reps, datasets: [{ label:"النتيجة", data: totals }] },
+        options: {
+          responsive:true,
+          maintainAspectRatio:false,
+          scales:{ y:{ beginAtZero:true, max:100 } },
+          plugins:{ legend:{display:false} }
+        }
+      });
+    }else{
+      chart.data.labels = state.reps;
+      chart.data.datasets[0].data = totals;
+      chart.update();
+    }
+  }catch(e){
+    document.getElementById("chartStatus").textContent = "حدث خطأ في المخطط";
+    document.getElementById("chartHint").textContent = "الإجمالي شغال، لكن المخطط يحتاج Chart.js.";
+  }
+}
+
+/* Excel */
+function exportToExcel(){
+  if(typeof XLSX === "undefined"){
+    alert("مكتبة Excel (XLSX) غير متاحة.");
+    return;
+  }
+  ensureActuals();
+
+  const settingsAoA = [["KPI_ID","KPI_Name","Target","Weight"]];
+  state.kpis.forEach(k => settingsAoA.push([k.id, k.name, k.target, k.weight]));
+  const wsSettings = XLSX.utils.aoa_to_sheet(settingsAoA);
+
+  const actualsAoA = [["KPI_ID","KPI_Name", ...state.reps]];
+  state.kpis.forEach(k => {
+    const row = [k.id, k.name];
+    const arr = state.actuals[k.id] || Array(state.reps.length).fill(0);
+    state.reps.forEach((_, i)=> row.push(arr[i] ?? 0));
+    actualsAoA.push(row);
+  });
+  const wsActuals = XLSX.utils.aoa_to_sheet(actualsAoA);
+
+  const summaryAoA = [["Supervisor_Name","Total_100"]];
+  state.reps.forEach((name, i)=> summaryAoA.push([name, totalForRep(i)]));
+  summaryAoA.push(["SumWeights", sumWeights()]);
+  const wsSummary = XLSX.utils.aoa_to_sheet(summaryAoA);
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, wsSettings, "Settings");
+  XLSX.utils.book_append_sheet(wb, wsActuals, "Actuals");
+  XLSX.utils.book_append_sheet(wb, wsSummary, "Summary");
+
+  const filename = `SMOU-KPI-Supervisors-${new Date().toISOString().slice(0,10)}.xlsx`;
+  XLSX.writeFile(wb, filename);
+}
+
+function importFromExcel(file){
+  if(typeof XLSX === "undefined"){
+    alert("مكتبة Excel (XLSX) غير متاحة.");
     return;
   }
 
-  thead.innerHTML="<tr>"+headers.map(h=>`<th>${h}</th>`).join("")+"</tr>";
-  tbody.innerHTML=res.map(r=>"<tr>"+headers.map(h=>`<td>${r[h]||""}</td>`).join("")+"</tr>").join("");
-  table.style.display="table";
-  document.getElementById("info").innerText=`عدد النتائج: ${res.length}`;
-});
-</script>
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try{
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, {type:"array"});
 
+      const wsSettings = wb.Sheets["Settings"];
+      const wsActuals  = wb.Sheets["Actuals"];
+      if(!wsSettings || !wsActuals){
+        throw new Error("لازم Sheets باسم: Settings و Actuals");
+      }
+
+      const settings = XLSX.utils.sheet_to_json(wsSettings, {defval:""});
+      const actualsRows = XLSX.utils.sheet_to_json(wsActuals, {defval:0});
+
+      const kpis = settings.map(r => ({
+        id: String(r.KPI_ID || "").trim(),
+        name: String(r.KPI_Name || "").trim(),
+        target: Number(r.Target) || 0,
+        weight: Number(r.Weight) || 0
+      })).filter(k => k.id && k.name);
+
+      const header = XLSX.utils.sheet_to_json(wsActuals, {header:1, defval:""})[0];
+      if(!header || header.length < 3) throw new Error("Sheet Actuals غير صحيح");
+      const reps = header.slice(2).map(x => String(x).trim()).filter(Boolean);
+      if(!reps.length) throw new Error("لا توجد أسماء مشرفين");
+
+      const actuals = {};
+      for(const row of actualsRows){
+        const id = String(row.KPI_ID || "").trim();
+        if(!id) continue;
+        actuals[id] = reps.map(repName => Number(row[repName]) || 0);
+      }
+
+      state = { kpis, reps, actuals };
+      saveState();
+      render();
+      alert("✅ تم الاستيراد بنجاح");
+    }catch(err){
+      alert("فشل الاستيراد: " + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+/* Actions */
+document.getElementById("addRepBtn").addEventListener("click", () => {
+  const name = prompt("اكتب اسم المشرف الجديد:");
+  if(!name) return;
+  state.reps.push(name.trim());
+  for(const k of state.kpis){
+    if(!state.actuals[k.id]) state.actuals[k.id] = [];
+    state.actuals[k.id].push(0);
+  }
+  saveState();
+  render();
+});
+
+document.getElementById("resetBtn").addEventListener("click", () => {
+  if(!confirm("هل تريد مسح جميع القيم؟")) return;
+  state = { kpis: defaultKpis, reps: defaultReps, actuals:{} };
+  saveState();
+  render();
+});
+
+document.getElementById("exportXlsxBtn").addEventListener("click", exportToExcel);
+document.getElementById("importXlsxBtn").addEventListener("click", () => document.getElementById("importXlsxFile").click());
+document.getElementById("importXlsxFile").addEventListener("change", (e) => {
+  const file = e.target.files?.[0];
+  if(!file) return;
+  importFromExcel(file);
+  e.target.value = "";
+});
+
+render();
+</script>
 </body>
 </html>
