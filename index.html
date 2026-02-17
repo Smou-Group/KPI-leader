@@ -50,7 +50,6 @@
     th.small, td.small{min-width:92px}
     th.wide, td.wide{min-width:140px}
     .kpiName{font-weight:800;line-height:1.25}
-    .hint{color:var(--muted);font-size:12px;margin-top:3px}
 
     input[type="number"]{width:92px;padding:8px 10px;border-radius:10px;border:1px solid rgba(0,0,0,.14);font-weight:800;text-align:center;outline:none}
     input[type="number"]:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(28,102,112,.12)}
@@ -134,9 +133,9 @@
 </div>
 
 <script>
-const STORAGE_KEY = "smou_kpi_supervisors_v1";
+const STORAGE_KEY = "smou_kpi_supervisors_v1"; // نفس المفتاح عشان يكمل على نفس البيانات
 
-/* البنود حسب الصورة */
+/* البنود */
 const defaultKpis = [
   { id:"k1", name:"تحقيق التارجت للفريق",                 target:10, weight:10 },
   { id:"k2", name:"عدد الزيارات الشهرية مع المناديب",     target:12, weight:10 },
@@ -148,11 +147,19 @@ const defaultKpis = [
   { id:"k8", name:"الالتزام بورشة العمل بواقع مرة أسبوعيًا", target:4, weight:10 },
 ];
 
-/* أسماء المشرفين (تقدر تغيرهم/تزودهم من زر إضافة مشرف) */
-const defaultReps = ["التارجت","شادي عبه","أحمد طه","محمد هاني"];
+/* أسماء المشرفين الافتراضية (بدون التارجت) */
+const defaultReps = ["محمد هاني","أحمد طه","شادي عبيه"];
 
 let state = loadState();
+migrateState();         // ✅ يحذف "التارجت" ويعدل الاسم
 let chart = null;
+
+function normalizeName(n){
+  return String(n||"").trim()
+    .replace(/\s+/g," ")
+    .replace(/^شادي\s+عبه$/,"شادي عبيه")
+    .replace(/^شادي\s+عيبه$/,"شادي عبيه");
+}
 
 function loadState(){
   try{
@@ -166,6 +173,46 @@ function loadState(){
     return { kpis: defaultKpis, reps: defaultReps, actuals:{} };
   }
 }
+
+function migrateState(){
+  // 1) توحيد أسماء المشرفين + تعديل شادي
+  state.reps = state.reps.map(normalizeName);
+
+  // 2) حذف أي عمود اسمه "التارجت"
+  const idx = state.reps.findIndex(n => n === "التارجت");
+  if(idx !== -1){
+    state.reps.splice(idx, 1);
+    for(const k of state.kpis){
+      if(Array.isArray(state.actuals?.[k.id])){
+        state.actuals[k.id].splice(idx, 1);
+      }
+    }
+  }
+
+  // 3) إزالة تكرارات (لو حصل)
+  const seen = new Set();
+  const mapOldToNew = [];
+  const newReps = [];
+  state.reps.forEach((n, i)=>{
+    if(!seen.has(n)){
+      seen.add(n);
+      mapOldToNew.push(i);
+      newReps.push(n);
+    }
+  });
+  if(newReps.length !== state.reps.length){
+    const newActuals = {};
+    for(const k of state.kpis){
+      const arr = Array.isArray(state.actuals?.[k.id]) ? state.actuals[k.id] : [];
+      newActuals[k.id] = mapOldToNew.map(oldIdx => arr[oldIdx] ?? 0);
+    }
+    state.reps = newReps;
+    state.actuals = newActuals;
+  }
+
+  saveState();
+}
+
 function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
 
 function ensureActuals(){
@@ -235,7 +282,8 @@ function render(){
   state.reps.forEach((name) => {
     const th = document.createElement("th");
     th.className = "wide";
-    th.innerHTML = `${escapeHtml(name)}<div class="hint">فعلي / نقاط</div>`;
+    // ✅ حذف كلمات "فعلي / نقاط"
+    th.innerHTML = `${escapeHtml(name)}`;
     tr1.appendChild(th);
   });
 
@@ -486,7 +534,11 @@ function importFromExcel(file){
 
       const header = XLSX.utils.sheet_to_json(wsActuals, {header:1, defval:""})[0];
       if(!header || header.length < 3) throw new Error("Sheet Actuals غير صحيح");
-      const reps = header.slice(2).map(x => String(x).trim()).filter(Boolean);
+      let reps = header.slice(2).map(x => normalizeName(x)).filter(Boolean);
+
+      // ✅ حذف التارجت لو موجود في ملف الاكسل
+      reps = reps.filter(n => n !== "التارجت");
+
       if(!reps.length) throw new Error("لا توجد أسماء مشرفين");
 
       const actuals = {};
@@ -497,7 +549,7 @@ function importFromExcel(file){
       }
 
       state = { kpis, reps, actuals };
-      saveState();
+      migrateState();
       render();
       alert("✅ تم الاستيراد بنجاح");
     }catch(err){
@@ -511,7 +563,9 @@ function importFromExcel(file){
 document.getElementById("addRepBtn").addEventListener("click", () => {
   const name = prompt("اكتب اسم المشرف الجديد:");
   if(!name) return;
-  state.reps.push(name.trim());
+  const clean = normalizeName(name);
+  if(!clean || clean === "التارجت") return;
+  state.reps.push(clean);
   for(const k of state.kpis){
     if(!state.actuals[k.id]) state.actuals[k.id] = [];
     state.actuals[k.id].push(0);
